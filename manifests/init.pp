@@ -65,6 +65,9 @@
 # [*packages*]
 #   Define the list of software packages which should be installed.
 #
+# [*use_crm*]
+#   Install the crmsh package as newer corosync distributions do not use it anymore.
+#
 # === Examples
 #
 #  class { 'corosync':
@@ -96,6 +99,7 @@ class corosync(
   $rrp_mode           = 'none',
   $ttl                = false,
   $packages           = ['corosync', 'pacemaker'],
+  $use_crm	      = true,
 ) {
 
   # Making it possible to provide data with parameterized class declarations or
@@ -232,32 +236,13 @@ class corosync(
     require => Package['corosync']
   }
 
-  case $::osfamily {
-    'RedHat': {
-      exec { 'enable corosync':
-        require => Package['corosync'],
-        before  => Service['corosync'],
-      }
-    }
-    'Debian': {
-      exec { 'enable corosync':
-        command => 'sed -i s/START=no/START=yes/ /etc/default/corosync',
-        path    => [ '/bin', '/usr/bin' ],
-        unless  => 'grep START=yes /etc/default/corosync',
-        require => Package['corosync'],
-        before  => Service['corosync'],
-      }
-    }
-    default: {}
-  }
-
   if $check_standby == true {
     # Throws a puppet error if node is on standby
     exec { 'check_standby node':
       command => 'echo "Node appears to be on standby" && false',
       path    => [ '/bin', '/usr/bin', '/sbin', '/usr/sbin' ],
       onlyif  => "crm node status|grep ${::hostname}-standby|grep 'value=\"on\"'",
-      require => Service['corosync'],
+      require => [ Service['corosync'], Package['crmsh'] ],
     }
   }
 
@@ -266,7 +251,24 @@ class corosync(
       command => 'crm node online',
       path    => [ '/bin', '/usr/bin', '/sbin', '/usr/sbin' ],
       onlyif  => "crm node status|grep ${::hostname}-standby|grep 'value=\"on\"'",
-      require => Service['corosync'],
+      require => [ Service['corosync'], Package['crmsh'] ],
+    }
+  }
+
+  if $use_crm == true {
+    $crm_source = $::operatingsystem ? {
+      'CentOS' => $::operatingsystemmajrelease ? {
+	'6'     => 'http://download.opensuse.org/repositories/network:/ha-clustering:/Stable/CentOS_CentOS-6/x86_64/crmsh-2.1-1.6.x86_64.rpm',
+	default => 'http://download.opensuse.org/repositories/network:/ha-clustering:/Stable/CentOS_CentOS-6/x86_64/crmsh-2.1-1.6.x86_64.rpm',
+      },
+      default  => 'http://download.opensuse.org/repositories/network:/ha-clustering:/Stable/CentOS_CentOS-6/x86_64/crmsh-2.1-1.6.x86_64.rpm',
+    }
+
+    package { 'crmsh':
+      ensure   => present,
+      source   => $crm_source,
+      provider => 'rpm',
+      require  => Package['pacemaker'],
     }
   }
 
