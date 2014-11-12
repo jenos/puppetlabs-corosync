@@ -256,19 +256,18 @@ class corosync(
   }
 
   if $use_crm == true {
-    $crm_source = $::operatingsystem ? {
-      'CentOS' => $::operatingsystemmajrelease ? {
-	'6'     => 'http://download.opensuse.org/repositories/network:/ha-clustering:/Stable/CentOS_CentOS-6/x86_64/crmsh-2.1-1.6.x86_64.rpm',
-	default => 'http://download.opensuse.org/repositories/network:/ha-clustering:/Stable/CentOS_CentOS-6/x86_64/crmsh-2.1-1.6.x86_64.rpm',
-      },
-      default  => 'http://download.opensuse.org/repositories/network:/ha-clustering:/Stable/CentOS_CentOS-6/x86_64/crmsh-2.1-1.6.x86_64.rpm',
+    yumrepo {'network_ha-clustering_Stable':
+      ensure   => present,
+      enabled  => '0',
+      baseurl  => "http://download.opensuse.org/repositories/network:/ha-clustering:/Stable/CentOS_CentOS-6/",
+      gpgkey   => "http://download.opensuse.org/repositories/network:/ha-clustering:/Stable/CentOS_CentOS-6/repodata/repomd.xml.key",
+      gpgcheck => true,
     }
 
     package { 'crmsh':
-      ensure   => present,
-      source   => $crm_source,
-      provider => 'rpm',
-      require  => Package['pacemaker'],
+      ensure          => present,
+      require         => [ Package['pacemaker'], Yumrepo['network_ha-clustering_Stable'] ],
+      install_options => [ '--enablerepo=network_ha-clustering_Stable' ]
     }
   }
 
