@@ -19,24 +19,15 @@ module Puppet
       isnamevar
     end
 
-    newproperty(:resources, :array_matching => :all) do
-      desc "List of resources (primitives, ms, etc) to be started in a specific order.
-        Must supply at least two resources."
+    newproperty(:first) do
+      desc "First Corosync primitive.  Just like colocation, our primitives for
+        ording come in pairs but this time order matters so we need to define
+        which primitive starts the desired state change chain."
+    end
 
-      # Have to redefine should= here so we can sort the array that is given to
-      # us by the manifest.  While were checking on the class of our value we
-      # are going to go ahead and do some validation too.  The way Corosync
-      # order works we need to only accept two value or more arrays.
-      def should=(value)
-        super
-        if value.is_a? Array
-          raise Puppet::Error, "Puppet::Type::Cs_Order: The primitives property must be at least a two value array." unless value.size >= 2
-          @should.sort!
-        else
-          raise Puppet::Error, "Puppet::Type::Cs_Order: The primitives property must be at least a two value array."
-          @should
-        end
-      end
+    newproperty(:second) do
+      desc "Second Corosync primitive.  Our second primitive will move to the
+        desired state after the first primitive."
     end
 
     newparam(:cib) do
@@ -93,9 +84,8 @@ module Puppet
         autos = []
         resource_type = @parameters[:resources_type].value
         if resource_type.to_sym == possible_resource_type.to_sym
-	  @parameters[:primitives].should.each do |val|
-	    autos << unmunge_cs_resourcename(val)
-	  end
+          autos << unmunge_cs_resourcename(@parameters[:first].should)
+          autos << unmunge_cs_resourcename(@parameters[:second].should)
         end
 
         autos
