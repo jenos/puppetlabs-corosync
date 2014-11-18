@@ -26,18 +26,25 @@ Puppet::Type.type(:cs_order).provide(:crm, :parent => Puppet::Provider::Crmsh) d
     doc = REXML::Document.new(raw)
 
     doc.root.elements['configuration'].elements['constraints'].each_element('rsc_order') do |e|
+      rscs = []
       items = e.attributes
 
-      if items['first-action']
-        first = "#{items['first']}:#{items['first-action']}"
-      else
-        first = items['first']
+      if items['rsc-role']
+        rscs << "#{items['rsc']}:#{items['rsc-role']}"
+      elsif items['rsc']
+        rscs << items['rsc']
       end
 
-      if items['then-action']
-        second = "#{items['then']}:#{items['then-action']}"
-      else
-        second = items['then']
+      if items ['with-rsc-role']
+        rscs << "#{items['with-rsc']}:#{items['with-rsc-role']}"
+      elsif items['with-rsc']
+        rscs << items['with-rsc']
+      end
+
+      if !items['rsc'] or !items['with-rsc']
+        e.elements['resource_set'].each_element('resource_ref') do |ref|
+          rscs << ref.attributes['id']
+        end
       end
 
       if items['symmetrical']
@@ -50,8 +57,7 @@ Puppet::Type.type(:cs_order).provide(:crm, :parent => Puppet::Provider::Crmsh) d
       order_instance = {
         :name           => items['id'],
         :ensure         => :present,
-        :first          => first,
-        :second         => second,
+        :resources      => rscs,
         :score          => items['score'],
         :symmetrical    => symmetrical,
         :provider       => self.name
@@ -67,8 +73,7 @@ Puppet::Type.type(:cs_order).provide(:crm, :parent => Puppet::Provider::Crmsh) d
     @property_hash = {
       :name         => @resource[:name],
       :ensure       => :present,
-      :first        => @resource[:first],
-      :second       => @resource[:second],
+      :resources    => @resource[:resources],
       :score        => @resource[:score],
       :symmetrical  => @resource[:symmetrical],
       :cib          => @resource[:cib],
@@ -85,12 +90,8 @@ Puppet::Type.type(:cs_order).provide(:crm, :parent => Puppet::Provider::Crmsh) d
   # Getters that obtains the first and second primitives and score in our
   # ordering definintion that have been populated by prefetch or instances
   # (depends on if your using puppet resource or not).
-  def first
-    @property_hash[:first]
-  end
-
-  def second
-    @property_hash[:second]
+  def resources
+    @property_hash[:resources]
   end
 
   def score
@@ -104,12 +105,8 @@ Puppet::Type.type(:cs_order).provide(:crm, :parent => Puppet::Provider::Crmsh) d
   # Our setters for the first and second primitives and score.  Setters are
   # used when the resource already exists so we just update the current value
   # in the property hash and doing this marks it to be flushed.
-  def first=(should)
-    @property_hash[:first] = should
-  end
-
-  def second=(should)
-    @property_hash[:second] = should
+  def resources=(should)
+    @property_hash[:resources] = should
   end
 
   def score=(should)
