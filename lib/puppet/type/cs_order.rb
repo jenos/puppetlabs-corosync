@@ -93,7 +93,7 @@ module Puppet
         autos = []
         resource_type = @parameters[:resources_type].value
         if resource_type.to_sym == possible_resource_type.to_sym
-	  @parameters[:primitives].should.each do |val|
+	  @parameters[:resources].should.each do |val|
 	    autos << unmunge_cs_resourcename(val)
 	  end
         end
